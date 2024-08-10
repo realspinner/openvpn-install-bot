@@ -14,7 +14,7 @@ authorized_users = {}
 
 
 def check_authorization(user_id) -> bool:
-    if user_id == SUPERUSER_ID:
+    if user_id in SUPERUSER_ID:
         return True
 
     if user_id in authorized_users.keys():
