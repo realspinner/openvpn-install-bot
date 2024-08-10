@@ -1058,29 +1058,35 @@ verb 3" >>/etc/openvpn/client-template.txt
 }
 
 function newClient() {
-	echo ""
-	echo "Tell me a name for the client."
-	echo "The name must consist of alphanumeric character. It may also include an underscore or a dash."
+	# Check arguments
+	if [ "$#" -eq 0 ]; then
+		echo ""
+		echo "Tell me a name for the client."
+		echo "The name must consist of alphanumeric character. It may also include an underscore or a dash."
 
-	until [[ $CLIENT =~ ^[a-zA-Z0-9_-]+$ ]]; do
-		read -rp "Client name: " -e CLIENT
-	done
+		until [[ $CLIENT =~ ^[a-zA-Z0-9_-]+$ ]]; do
+			read -rp "Client name: " -e CLIENT
+		done
 
-	echo ""
-	echo "Do you want to protect the configuration file with a password?"
-	echo "(e.g. encrypt the private key with a password)"
-	echo "   1) Add a passwordless client"
-	echo "   2) Use a password for the client"
+		echo ""
+		echo "Do you want to protect the configuration file with a password?"
+		echo "(e.g. encrypt the private key with a password)"
+		echo "   1) Add a passwordless client"
+		echo "   2) Use a password for the client"
 
-	until [[ $PASS =~ ^[1-2]$ ]]; do
-		read -rp "Select an option [1-2]: " -e -i 1 PASS
-	done
+		until [[ $PASS =~ ^[1-2]$ ]]; do
+			read -rp "Select an option [1-2]: " -e -i 1 PASS
+		done
+	else
+		CLIENT="$1"
+		PASS="1"
+	fi
 
 	CLIENTEXISTS=$(tail -n +2 /etc/openvpn/easy-rsa/pki/index.txt | grep -c -E "/CN=$CLIENT\$")
 	if [[ $CLIENTEXISTS == '1' ]]; then
 		echo ""
 		echo "The specified client CN was already found in easy-rsa, please choose another name."
-		exit
+		exit 3
 	else
 		cd /etc/openvpn/easy-rsa/ || return
 		case $PASS in
@@ -1161,7 +1167,7 @@ function revokeClient() {
 	if [[ $NUMBEROFCLIENTS == '0' ]]; then
 		echo ""
 		echo "You have no existing clients!"
-		exit 1
+		exit 2
 	fi
 
 	echo ""
@@ -1333,11 +1339,44 @@ function manageMenu() {
 	esac
 }
 
+
+# Function to check the arguments provided to the script.
+# If no arguments provided it just returns.
+function checkArguments() {
+	if [ "$#" -eq 0 ]; then
+		return
+	fi
+
+	if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+		displayHelp
+		exit 0
+	fi
+
+	if [[ "$1" == '-u' || "$1" == "--user" ]]; then
+		if [ "$#" -ge 2 ]; then
+			newClient "$2"
+			exit 0
+		else
+			echo "Please provide a username"
+			exit 4
+		fi
+	fi
+}
+
+# Display the usage information for the script.
+function displayHelp() {
+	echo "Usage: openvpn-install.sh [option]"
+	echo "  -h, --help		Display this help text and exit"
+	echo "  -u, --user <username> Create a passwordless client with the specified username"
+}
+
+
 # Check for root, TUN, OS...
 initialCheck
 
 # Check if OpenVPN is already installed
 if [[ -e /etc/openvpn/server.conf && $AUTO_INSTALL != "y" ]]; then
+	checkArguments "$@"
 	manageMenu
 else
 	installOpenVPN
