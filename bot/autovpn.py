@@ -55,7 +55,7 @@ async def display_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     # Read KEYS_PATH directory and list all .ovpn files
-    message = "List of users:\n<pre>"
+    message = "List of clients:\n<pre>"
     client_list = list_clients()
     count = len(client_list)
 
@@ -64,7 +64,7 @@ async def display_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         index += 1
         message += f"{index:02d}. {client}\n"
 
-    message += "</pre>\n" + str(count) + " users in total."
+    message += "</pre>\n" + str(count) + " clients in total."
 
     await update.message.reply_text(message, parse_mode="HTML")
 
