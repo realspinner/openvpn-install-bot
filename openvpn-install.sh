@@ -1383,7 +1383,8 @@ function checkArguments() {
 function displayHelp() {
 	echo "Usage: openvpn-install.sh [option]"
 	echo "  -h, --help		Display this help text and exit"
-	echo "  -u, --user <username> Create a passwordless client with the specified username"
+	echo "  -u, --user <name> Create a passwordless client with the specified name"
+	echo "  -r, --revoke <name> Revoke a client with the specified name"
 }
 
 
