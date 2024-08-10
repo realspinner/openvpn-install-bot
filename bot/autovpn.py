@@ -2,11 +2,12 @@ import os
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
-from secrets import APP_TOKEN, MAGIC_WORD, AUTH_TTL, KEYS_PATH, SUPERUSER_ID
+from secrets import APP_TOKEN, MAGIC_WORD, AUTH_TTL, KEYS_PATH, SUPERUSER_ID, SCRIPT
 from datetime import datetime
 from os import path
 from typing import List
 import json
+import subprocess
 
 
 authorized_users = {}
@@ -41,10 +42,10 @@ async def display_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(
         f'List of commands:\n'
-        f'/add <username> - Add a new user to the service\n'
-        f'/remove <username> - Remove a user from the service\n'
-        f'/list - List all users\n'
-        f'/get <username> - Get a key file of the user\n'
+        f'/add <client> - Add a new client to the service\n'
+        f'/remove <client> - Remove a client from the service\n'
+        f'/list - List all clients\n'
+        f'/get <client> - Get a key file of the client\n'
         f'/help - Show this help message\n')
 
 
@@ -55,38 +56,38 @@ async def display_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Read KEYS_PATH directory and list all .ovpn files
     message = "List of users:\n<pre>"
-    userlist = list_users()
-    count = len(userlist)
+    client_list = list_clients()
+    count = len(client_list)
 
     index = 0
-    for username in userlist:
+    for client in client_list:
         index += 1
-        message += f"{index:02d}. {username}\n"
+        message += f"{index:02d}. {client}\n"
 
     message += "</pre>\n" + str(count) + " users in total."
 
     await update.message.reply_text(message, parse_mode="HTML")
 
 
-def list_users() -> List[str]:
-    user_list = []
+def list_clients() -> List[str]:
+    client_list = []
     for filename in os.listdir(KEYS_PATH):
         if filename.endswith(".ovpn"):
-            username = filename.split(".ovpn")[0]
-            if len(username) > 0:
-                user_list.append(username)
-    # Sort userlist
-    user_list.sort()
-    return user_list
+            client = filename.split(".ovpn")[0]
+            if len(client) > 0:
+                client_list.append(client)
+    # Sort client
+    client_list.sort()
+    return client_list
 
 
-def get_userlist_keyboard(cmd: str = "get") -> InlineKeyboardMarkup:
+def get_clients_keyboard(cmd: str = "get") -> InlineKeyboardMarkup:
     """Generates the base keyboard layout."""
-    user_list = list_users()
+    client_list = list_clients()
     keyboard = []
 
-    for username in user_list:
-        keyboard.append([InlineKeyboardButton(username, callback_data=json.dumps({"cmd": cmd, "username": username}))])
+    for username in client_list:
+        keyboard.append([InlineKeyboardButton(username, callback_data=json.dumps({"cmd": cmd, "client": username}))])
 
     return InlineKeyboardMarkup(keyboard)
 
@@ -97,7 +98,7 @@ async def get_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if len(context.args) == 0:
-        await update.message.reply_text(f'Select from the list', reply_markup=get_userlist_keyboard())
+        await update.message.reply_text(f'Select from the list', reply_markup=get_clients_keyboard())
         return
 
     try:
@@ -105,25 +106,25 @@ async def get_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError:
         index = -1
 
-    user_list = list_users()
+    client_list = list_clients()
 
     if index > 0:
-        if index > len(user_list):
-            await update.message.reply_text(f'User {index} not found.')
+        if index > len(client_list):
+            await update.message.reply_text(f'Client {index} not found.')
             return
-        username = user_list[index - 1]
+        client = client_list[index - 1]
 
     else:
-        username = context.args[0]
+        client = context.args[0]
 
-    await download_file(update.message, username)
+    await download_file(update.message, client)
 
 
-async def download_file(message, username) -> None:
-    if not path.exists(KEYS_PATH + username + ".ovpn"):
-        await message.reply_text(f'User {username} not found.')
+async def download_file(message, client) -> None:
+    if not path.exists(KEYS_PATH + client + ".ovpn"):
+        await message.reply_text(f'Client {client} not found.')
         return
-    await message.reply_document(open(KEYS_PATH + username + ".ovpn", 'rb'))
+    await message.reply_document(open(KEYS_PATH + client + ".ovpn", 'rb'))
 
 
 async def process_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -144,42 +145,55 @@ async def process_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     if request['cmd'] == 'get':
-        await download_file(query.message, request['username'])
+        await download_file(query.message, request['client'])
         return
 
     if request['cmd'] == 'remove':
-        await query.edit_message_text(text=f'Are you sure you want to remove {request["username"]}?',
-                                      reply_markup=get_remove_confirmation_buttons(request['username']))
+        await query.edit_message_text(text=f'Are you sure you want to remove {request["client"]}?',
+                                      reply_markup=get_remove_confirmation_buttons(request['client']))
         return
 
     if request['cmd'] == 'kill':
-        result = _do_remove_user(request['username'])
+        result = _do_remove_client(request['client'])
         if result:
-            await query.edit_message_text(text=f'User {request["username"]} removed.')
+            await query.edit_message_text(text=f'User {request["client"]} removed.')
             return
         else:
-            await query.edit_message_text(text=f'Error while removing user {request["username"]}')
+            await query.edit_message_text(text=f'Error while removing user {request["client"]}')
             return
 
     if request['cmd'] == 'spare':
-        await query.edit_message_text(text=f'OK, {request["username"]} stays here.')
+        await query.edit_message_text(text=f'OK, {request["client"]} stays here.')
         return
 
     await query.edit_message_text(text=f"Unknown request: {query.data}")
 
 
-async def create_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pass
+async def create_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not check_authorization(update.effective_user.id):
+        await unauthorized_error_message(update)
+        return
+
+    if len(context.args) == 0:
+        await update.message.reply_text(f'You have to specify a client name',
+                                        reply_markup=get_clients_keyboard('remove'))
+        return
+
+    (result, message) = _do_create_client(context.args[0])
+    if result:
+        await download_file(update.message, context.args[0])
+    else:
+        await update.message.reply_text(message)
 
 
-async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def remove_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not check_authorization(update.effective_user.id):
         await unauthorized_error_message(update)
         return
 
     if len(context.args) == 0:
         await update.message.reply_text(f'Select from the list',
-                                        reply_markup=get_userlist_keyboard('remove'))
+                                        reply_markup=get_clients_keyboard('remove'))
         return
 
     try:
@@ -187,38 +201,59 @@ async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     except ValueError:
         index = -1
 
-    user_list = list_users()
+    client_list = list_clients()
 
     if index > 0:
-        if index > len(user_list):
-            await update.message.reply_text(f'User {index} not found.')
+        if index > len(client_list):
+            await update.message.reply_text(f'Client {index} not found.')
             return
-        username = user_list[index - 1]
+        client = client_list[index - 1]
 
     else:
-        username = context.args[0]
+        client = context.args[0]
 
     await update.message.reply_text(
-        f'Are you sure you want to remove {username}?',
-        reply_markup=get_remove_confirmation_buttons(username))
+        f'Are you sure you want to remove {client}?',
+        reply_markup=get_remove_confirmation_buttons(client))
 
 
-def get_remove_confirmation_buttons(username) -> InlineKeyboardMarkup:
+def get_remove_confirmation_buttons(client) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(
             'Yes',
-            callback_data=json.dumps({"cmd": "kill", "username": username})),
+            callback_data=json.dumps({"cmd": "kill", "client": client})),
          InlineKeyboardButton(
                 'No',
-                callback_data=json.dumps({"cmd": "spare", "username": username}))]])
+                callback_data=json.dumps({"cmd": "spare", "client": client}))]])
 
 
-def _do_add_user(username: str) -> bool:
-    pass
+def _do_create_client(client: str) -> (bool, str):
+    if not path.exists(SCRIPT):
+        return False, f"Error: {SCRIPT} not found."
+
+    try:
+        proc = subprocess.run([SCRIPT, "-u", client], check=True)
+    except subprocess.CalledProcessError as e:
+        return False, f"Exec error: {e}"
+
+    if proc.returncode != 0:
+        return False, f"Error code {proc.returncode}"
+
+    return True, "OK"
 
 
-def _do_remove_user(username: str) -> bool:
-    return True
+def _do_remove_client(client: str) -> (bool, str):
+    if not path.exists(SCRIPT):
+        return False, f"Error: {SCRIPT} not found."
+    try:
+        proc = subprocess.run([SCRIPT, "-r", client], check=True)
+    except subprocess.CalledProcessError as e:
+        return False, f"Exec error: {e}"
+
+    if proc.returncode != 0:
+        return False, f"Error code {proc.returncode}"
+
+    return True, "OK"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -254,7 +289,8 @@ app.add_handler(CommandHandler("login", login))
 app.add_handler(CommandHandler("help", display_help))
 app.add_handler(CommandHandler("list", display_list))
 app.add_handler(CommandHandler("get", get_file))
-app.add_handler(CommandHandler("remove", remove_user))
+app.add_handler(CommandHandler("remove", remove_client))
+app.add_handler(CommandHandler("add", create_client))
 app.add_handler(CommandHandler("myid", display_my_id))
 app.add_handler(CallbackQueryHandler(process_button))
 
