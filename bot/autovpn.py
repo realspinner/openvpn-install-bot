@@ -179,8 +179,7 @@ async def create_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     if len(context.args) == 0:
-        await update.message.reply_text(f'You have to specify a client name',
-                                        reply_markup=get_clients_keyboard('remove'))
+        await update.message.reply_text(f'You have to specify a client name')
         return
 
     (result, message) = _do_create_client(context.args[0])
