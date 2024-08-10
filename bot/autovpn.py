@@ -128,6 +128,10 @@ async def download_file(message, client) -> None:
 
 
 async def process_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not check_authorization(update.effective_user.id):
+        await unauthorized_error_message(update)
+        return
+
     """Parses the CallbackQuery and updates the message text."""
     query = update.callback_query
 
