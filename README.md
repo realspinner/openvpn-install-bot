@@ -4,7 +4,8 @@
 ![Lint](https://github.com/angristan/openvpn-install/workflows/Lint/badge.svg)
 [![Say Thanks!](https://img.shields.io/badge/Say%20Thanks-!-1EAEDB.svg)](https://saythanks.io/to/angristan)
 
-OpenVPN installer for Debian, Ubuntu, Fedora, CentOS, Arch Linux, Oracle Linux, Rocky Linux and AlmaLinux. Automated generation of new users with Telegram bot.
+OpenVPN installer for Debian, Ubuntu, Fedora, CentOS, Arch Linux, Oracle Linux, Rocky Linux and AlmaLinux.
+This script can be used in non-interactive mode to create and revoke clients. A simple Telegram bot is included for convenient control of the service
 
 This script will let you setup your own secure VPN server in just a few seconds.
 
